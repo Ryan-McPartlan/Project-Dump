@@ -1,0 +1,1302 @@
+//To do:
+//Template swap?
+
+#include <stack>
+#include <queue>
+#include <string>
+#include <iostream>
+#include <ctime>
+//Stack for the deck, que for player 1's pile, que for player 2's attack
+using namespace std;
+
+struct CARD
+{
+    string name;
+    string suit;
+    int value;
+    string special;
+    string specialText;
+} cards[54];
+
+void swap(CARD &a, CARD &b)
+{
+	CARD temp;
+	temp = a;
+	a = b;
+	b = temp;
+}
+void bubble_sort(CARD arr[], int n)
+{
+	bool swapped = true;
+
+	while (swapped == true)
+	{
+		swapped = false;
+
+
+		for (int i = 1; i < n; i++)
+		{
+			if (arr[i].value < arr[i - 1].value)
+			{
+				swap(arr[i], arr[i-1]);
+				swapped = true;
+			}
+		}
+	}
+}
+void insertion_sort(CARD arr[], int n)
+{
+	int j;
+
+
+	for (int i = 0; i < n; i++)
+	{
+		j = i;
+		while (j > 0 && arr[j].value < arr[j-1].value)
+		{
+			swap(arr[j], arr[j-1]);
+			j = j - 1;
+		}
+	}
+}
+void selection_sort(CARD arr[], int n)
+{
+	int iMin, j, i;
+
+
+	for (j = 0; j < n - 1; j++)
+	{
+		iMin = j;
+		for (i = j + 1; i < n; i++)
+		{
+			if (arr[i].value < arr[iMin].value)
+			{
+				iMin = i;
+			}
+		}
+		if (iMin != j)
+		{
+			swap(arr[j], arr[iMin]);
+		}
+	}
+
+
+}
+int partition(CARD arr[], int start, int end)
+{
+	int pivotValue, pivotIndex, mid;
+	mid = (start + end) / 2;
+	swap(arr[start], arr[mid]);
+	pivotIndex = start;
+	pivotValue = arr[start].value;
+
+
+	for (int i = start + 1; i <= end; i++)
+	{
+		if (arr[i].value < pivotValue)
+		{
+			pivotIndex++;
+			swap(arr[pivotIndex], arr[i]);
+		}
+	}
+	swap(arr[start], arr[pivotIndex]);
+	return pivotIndex;
+}
+void print_array(CARD array[],int n) 
+{
+	for (int j = 0; j < n; j++)
+		cout << array[j].name << endl;
+	cout << endl;
+}
+
+
+void quickSort(CARD arr[], int start, int end)
+{
+	int pivotPoint;
+	if (start < end)
+	{
+		// Get the pivot point.
+		pivotPoint = partition(arr, start, end);
+		// Sort the first sublist.
+		quickSort(arr, start, pivotPoint - 1);
+		// Sort the second sublist.
+		quickSort(arr, pivotPoint + 1, end);
+	}
+}
+
+
+void playGame(int&, int&, int&, int&, int&, int&, CARD[]);
+void shuffle(CARD[]);
+void cardSwap(CARD&, CARD&);
+void instructions(int& playerChoice, bool& viewedInstructions);
+int records(int, int, int, int, int, int, int);
+int credits();
+void sayBye(int, int, int, int, int);
+int leaveChoice();
+
+
+void draw(CARD[], CARD[], CARD, stack<CARD>&, string&);
+void addToArmy(int, CARD [], CARD[], CARD, queue<CARD>&, queue<CARD>&);
+void resolveRound(CARD [], CARD [], CARD, queue<CARD>&, queue<CARD>&, int&, int&, stack<CARD>&, stack<CARD>&, stack<CARD>&, stack<CARD>&);
+void resolveGame(stack<CARD>&, stack<CARD>&, stack<CARD>&, stack<CARD>&, int, int, int&, int&, int&, int&, int&, string);
+
+
+int main()
+{
+    int playerChoice1 = 1;
+    bool viewedCredits = false;
+    bool viewedInstructions = false;
+    
+	srand(time(NULL));
+
+
+    //Makes the cards
+    for(int i = 0; i < 54; i++)
+    {
+        if(i < 13)
+        {
+            cards[i].value = i+1;
+            cards[i].suit = "Swords";
+            cards[i].specialText = "When revealed, Swords will increase your total attack by 1 + the number of Swords cards revealed this round.";
+        }
+        else if(i < 26)
+        {
+            cards[i].value = i-12;
+            cards[i].suit = "Coins";
+            cards[i].specialText = "When revealed, Coins will increase your victory points by 1 + the number of Coins revealed this round.";
+        }
+        else if(i < 39)
+        {
+            cards[i].value = i-25;
+            cards[i].suit = "Skulls";
+            cards[i].specialText = "You will gain 2 score for each Skulls card in your graveyard at the end of the game.";
+        }
+        else if(i < 52)
+        {
+            cards[i].value = i-38;
+            cards[i].suit = "Tricks";
+            cards[i].specialText = "Trick cards are very clever, and take 3 additional attack to capture or kill.";
+        }
+        else
+        {
+            cards[i].value = 0;
+            cards[i].suit = "Joker";
+            cards[i].name = "Joker";
+            cards[i].special = "Joker";
+            cards[i].specialText = "This card will swap places with the enemy card revealed simultaneously with it!";   
+        }
+        
+        //Names and specials by value
+        if(cards[i].value == 0);
+        else if(cards[i].value == 1)
+        {
+            cards[i].name = "Ace of " + cards[i].suit;
+            cards[i].special = cards[i].suit;
+        }
+        else if (cards[i].value <= 10)
+        {
+            cards[i].name = to_string(cards[i].value) + " of " + cards[i].suit;
+            cards[i].special = cards[i].suit;
+        }
+        else if(cards[i].value == 11)
+        {
+            cards[i].name = "Jack of " + cards[i].suit;
+            cards[i].special = "Royal" + cards[i].suit;
+        }
+        else if(cards[i].value == 12)
+        {
+            cards[i].name = "Queen of " + cards[i].suit;
+            cards[i].special = "Royal" + cards[i].suit;
+        }
+        else if(cards[i].value == 13)
+        {
+            cards[i].name = "King of " + cards[i].suit;
+            cards[i].special = "Royal" + cards[i].suit;
+        }
+        
+        if(cards[i].value > 10)
+        {
+            if(cards[i].suit == "Swords")
+            {
+                cards[i].specialText = "The Royal entourage of Swords gains double benefits from the Swords attack bonus, but they will always die in place of your CHARGER.";
+            }
+            else if(cards[i].suit == "Tricks")
+            {
+                cards[i].specialText = "If you are losing by 30 points and royal Tricks card is revealed as your commander, you instantly gain 45 points.";
+            }
+            else if(cards[i].suit == "Skulls")
+            {
+                cards[i].specialText = "The Royal entourage of skulls adds bonus attack points to your total equal to the value of the card at the top of your graveyard.";
+            }
+            else if(cards[i].suit == "Coins")
+            {
+                cards[i].specialText = "The Royal entourage of Coins steals 1-5 victory points from your opponent, depending on how close they are to the front.";
+            }
+        }
+    }
+    
+    //For records
+    int gamesPlayed = 0;
+    int highestVP = 0;
+    int totalVP = 0;
+    int wins = 0;
+    int losses = 0;
+    int ties = 0;
+    int concedes = 0;
+    
+    cout << "Welcome to card dueling! What would you like to do!" << endl;
+    
+    while(playerChoice1 != 0)
+    {
+        cout << "1: Play a round" << endl;
+        cout << "2: Learn about the game." << endl;
+        cout << "3: Check out my records for this session" << endl;
+        cout << "4: View the credits" << endl;
+        cout << "0: Exit" << endl;
+        cout << "I want too...";
+        cin >> playerChoice1;
+        cout << endl;
+        
+        switch (playerChoice1)
+        {
+            case 1:
+                gamesPlayed += 1;
+				playGame(highestVP, totalVP, wins, losses, ties, concedes, cards);
+                break;
+                
+            case 2:
+                instructions(playerChoice1,viewedInstructions);
+                break;
+                
+            case 3:
+                records(gamesPlayed, highestVP, totalVP, wins, losses, ties, concedes);
+                break;
+                
+            case 4:
+                if(!viewedCredits)
+                {
+                    viewedCredits = true;
+                }
+                playerChoice1 = credits();
+                break;
+                
+            case 0:
+                break;
+                
+            default:
+                cout << "That was not a proper input!" << endl << endl;
+        }
+    }
+    
+    sayBye(gamesPlayed, highestVP, wins, losses, ties);
+    return 0;
+}
+
+
+void playGame(int& highestVP, int& totalVP, int& wins, int& losses, int& ties, int& concedes, CARD cardsArray[])
+{
+	stack<CARD> deck;
+    stack<CARD> playerGrave;
+    stack<CARD> compGrave;
+    stack<CARD> playerCapture;
+    stack<CARD> compCapture;
+    queue<CARD> playerArmy;
+    queue<CARD> compArmy;
+    CARD playerHand[5];
+    CARD compHand[5];
+	CARD shuffler[54];
+	CARD placeholder;
+	string gameOn = "true";
+
+
+	int playerCoinVP = 0;
+	int compCoinVP = 0;
+
+
+	placeholder.name = "Placeholder";
+
+
+	//Initializes hands to placeholders
+	for(int i = 0; i < 5; i++)
+	{
+		playerHand[i] = placeholder;
+		compHand[i] = placeholder;
+	}
+
+
+	//Copies our master cards list into the shuffler
+	for(int i = 0; i < 54; i++)
+	{
+	shuffler[i] = cardsArray[i];
+	}
+	//Shuffles the cards
+	shuffle(shuffler);
+	//Place the shuffled cards into a stack. Our deck is ready for play!
+	for(int i= 0; i < 30; i++)
+	{
+		deck.push(shuffler[i]);
+	}
+
+
+	cout << "The game begins! You each draw 5 cards!" << endl;
+	cout << "The 5 cards you draw are..." << endl;
+
+
+	//Players draw their starting hands!
+	draw(playerHand, compHand, placeholder, deck, gameOn);
+
+
+	while(gameOn == "true")
+	{
+		int gameChoice;
+
+
+		//Play a card, check something, or leave!
+		cout << endl;
+		cout << "Press 1-5 to add cards 1-5 to your army queue!" << endl;
+		cout << "Press 6 to check your hand." << endl;
+		cout << "Press 7 to examine the victory piles, graveyards, and deck." << endl;
+		cout << "Press 0 to concede the game. This will add one loss/concede to your records, and not update any other records." << endl;
+		cout << "Lets...";
+		cin >> gameChoice;
+		cout << endl;
+
+
+		switch (gameChoice)
+		{
+		//Case 1-5 do the same thing
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+			addToArmy((gameChoice -1), playerHand, compHand, placeholder, playerArmy, compArmy);
+			break;
+
+
+		case 6:
+			for(int i = 0; i < 5; i++)
+			{
+				cout << (i + 1) << ". ";
+				if(playerHand[i].name == placeholder.name)
+				{
+					cout << "This card has already been used." << endl;
+				}
+				else 
+					cout << "The " << playerHand[i].name << "." << endl;
+			}
+			break;
+
+
+		case 7:
+			if(deck.empty())
+				cout << "The deck is empty! The game will end when the next card is drawn!" << endl;
+			else if(deck.size() < 4)
+				cout << "The deck only has " << deck.size() << " cards left! This will likely be the last round!" << endl;
+			else if(deck.size() < 10)
+			    cout << "The deck has " << deck.size() << " cards left! The game will end soon!" << endl;
+			else if(deck.size() < 20)
+			    cout << "The deck has " << deck.size() << " cards left." << endl;
+			else if(deck.size() == 20)
+				cout << "The deck has " << deck.size() << " cards left. Only the starting hands have been drawn." << endl;
+			else
+				cout << "Error message. I made a mistake!" << endl;
+
+
+			if(!playerGrave.empty())
+				cout << "The card on the top of your graveyard is the " << playerGrave.top().name << endl;
+			else
+				cout << "Your graveyard is empty." << endl; 
+
+
+			if(!compGrave.empty())
+				cout << "The card on the top of your opponent's graveyard is the " << compGrave.top().name << endl;
+			else
+				cout << "The enemy graveyard is empty." << endl; 
+
+
+			if(!playerCapture.empty())
+				cout << "You have captured " << playerCapture.size() << " cards." << endl;
+			else
+				cout << "You haven't captured any cards" << endl; 
+
+
+			if(!compCapture.empty())
+				cout << "Your enemy has captured " << compCapture.size() << " cards." << endl;
+			else
+				cout << "Your enemy hasn't captured any cards" << endl; 
+
+
+			cout << "Points will be totaled at the end of the game." << endl;
+
+
+			break;
+
+
+		case 0:
+			gameOn = "concede";
+			concedes += 1;
+			losses +=1;
+			break;
+
+
+		default:
+			cout << "That was not a valid response." << endl << endl;
+			break;
+		}
+
+
+		if(playerArmy.size() == 5)
+		{
+			//This will play the 2 queues, increasing temp coin/sword bonus + permanent coin VP bonus and sending cards to the 4 piles
+			cout << "That's all the cards in your hand! You're ready to start!" << endl << endl;
+			resolveRound(playerHand, compHand, placeholder, playerArmy, compArmy, playerCoinVP, compCoinVP, playerCapture, compCapture, playerGrave, compGrave);
+			draw(playerHand, compHand, placeholder, deck, gameOn); //Gets us ready for the next round
+		}
+	}
+    
+    if(gameOn != "Concede")
+    {
+        cout << "The last card has been drawn from the deck! This game will now resolve!" << endl;
+    	resolveGame(playerGrave, compGrave, playerCapture, compCapture, playerCoinVP, compCoinVP, highestVP, totalVP, wins, losses, ties, gameOn);
+    }
+}
+
+
+void instructions(int& playerChoice1, bool& viewedInstructions)
+{
+    int instChoice = 1;
+    
+    if(!viewedInstructions)
+    {
+        viewedInstructions = true;
+    }
+    
+    while(instChoice != 0 && instChoice != 7)
+    {
+        cout << "What would you like to learn about?" << endl;
+        cout << "1: Game overview" << endl;
+        cout << "2: Rounds" << endl;
+        cout << "3: Scoring" << endl;
+        cout << "4: Suit effects" << endl;
+        cout << "5: Special effects" << endl;
+        cout << "6: Data structures used in this game." << endl;
+        cout << "7: Go back" << endl;
+        cout << "0: Exit program" << endl;
+        cout << "How about...";
+        cin >> instChoice;
+        cout << endl;
+        
+        switch(instChoice)
+        {
+            case 0:
+                playerChoice1 = 0;
+                break;
+            case 1:
+                cout << "When the game starts, a deck of playing cards is shuffled. The player and the computer both draw 5 playing cards." << endl;
+                cout << "Each of these cards have a value, 1-10 for number cards, 11/12/13 for jack/queen/king, and 0 for joker." << endl;
+                cout << "Each card also has a suit, COINS, SWORDS, SKULLS, or TRICKS, which will cause them to do something special. More about this in 'suits'." << endl;
+                cout << "Each round, both players will add all of their cards to the BATTLE QUEUE. These cards will either die, get captured, or be returned to their hands." << endl;
+                cout << "Players will draw cards to replace any that died or were captured at the end of the round. The game ends when the deck runs out of cards." <<  endl;
+                cout << "In order to make games last a good amount of time, 24 cards are removed from the 54 card deck, leaving 20 after the initial drawing of cards." << endl;
+                cout << "Each round, the two armies will do battle. Cards will die in every battle, and the winner will also capture some of the losers cards. More about this in 'rounds'" << endl; 
+                cout << "Dead cards are sent to the GRAVEYARDS, and captured cards go to players VICTORY PILES." << endl;
+                cout << "At the end of the game, players will gain and lose VICTORY POINTS based on the cards in their victory pile or graveyards. More about this in 'scoring'." << endl;
+                cout << "The player with the most victory points will win!" << endl << endl;
+                break;
+                
+            case 2:
+                cout << "When the player puts all of his cards into the queue, the round will start." << endl;
+                cout << "The card in the 1st position charges headfirst into the battle, and will always die at the end of the round." << endl;
+                cout << "The risk may be worth the reward, as the CHARGER card contributes its value twice to your attack." << endl;
+                cout << "The card in the second position is a frontline FIGHTER, who will always be captured or killed if the battle is lost." << endl;
+                cout << "You need to win by 5 or more points to successfully capture a FIGHTER." << endl;
+                cout << "The PEASANT in the third position stands in the centre of your army, and does nothing special." << endl;
+                cout << "He will be captured if your opponent wins by 10 or more attack, and die if your opponent wins by 5-10 attack" << endl;
+                cout << "The RANGER in the fourth position cannot contribute as directly, and take a -7 penalty to their attack, no less than 1." << endl;
+                cout << "The RANGER will be captured if the enemy wins by 15 or more attack, and dies if they win by 10-15." << endl;
+                cout << "The COMMANDER in the fifth position guides the army safely from afar. He cannot be affected by the enemy, but ONLY contributes their special effect." << endl;
+                cout << "Face cards have special effects by the way, did I not mention that before? More about this in 'Special effects'" << endl << endl;
+                break;
+                
+            case 3:
+                cout << "The game will end when the last card is drawn from the deck. Each player will now have a graveyard, a victory pile, and a hand." << endl;
+                cout << "Each card in a player's VICTORY PILE will contribute its value as victory points." << endl; 
+                cout << "The player will lose 2 points for every non - skull card in their graveyard, and gain 2 for each skull card in their graveyard." << endl;
+                cout << "The player will be shown the total score he has earned from coins cards, and this will be added to their point total." << endl;;
+                cout << "The cards remaining in either player's hands during the endgame are not factored into scoring." << endl << endl;
+                break;
+                
+            case 4:
+                cout << "The playing cards used are the same as any you might come across, but with different suits." << endl;
+                cout << "These cards use the suits Swords, Tricks, Coins, and Skulls." << endl; 
+                cout << "For each card of Swords you reveal, all future Swords cards revealed this round gain +1 attack." << endl;
+                cout << "Each Coins card revealed awards its controller 1 victory point per Coins card revealed this round" << endl;
+                cout << "A Trick card will take 3 additional enemy attack to kill or capture." << endl;
+                cout << "At the end of a game, players gain 2 victory points for each Skull card they have in their graveyard" << endl << endl;
+                break;
+                
+            case 5:
+                cout << "There are also a number of special interactions that can occur, including special powers for each King, Queen, Jack, and the two Jokers." << endl;
+                cout << "The two jokers swap sides with the enemy card they are revealed with." << endl;
+                cout << "If the King, Queen, or Jack of Skulls is revealed, the revealer gains attack equal to the value of the card on top of their graveyard." << endl;
+                cout << "A face card of Swords will gain double attack from Swords bonuses." << endl;
+                cout << "If a player has 3 times the other's score and a face card of Tricks is revealed by the loser, the loser will gain 30 attack." << endl;
+                cout << "Finally, a face card of Coins will steal 1-5 victory points from your opponent, depending on how close it is to the front." << endl << endl;
+                break;
+                
+            case 6:
+                cout << "A large number of material covered in class are used in this program." << endl;
+                cout << "Many variables and structures are passed to functions by reference to change them from inside the function." << endl;
+                cout << "Each card is based on a structure containing a value, suit, and information about the card’s special ability" << endl;
+                cout << "The deck is a stack, as only the card on top of the deck matters." << endl;
+				cout << "The deck is shuffled using swap, using concepts from sorting algorithms." << endl;
+                cout << "The player and computer's hands are both linked lists." << endl;
+                cout << "When the player or computer chooses an order to play their cards, they are adding them to a queue." << endl;
+                cout << "Drawing cards from the deck and revealing cards in the queue use methods associated with these data types." << endl;
+                cout << "When the game is over, sorting algorithms are used to display the cards in each player's graveyards, and victory piles." << endl << endl;
+                break;
+                
+            case 7:
+                playerChoice1 = 4;
+                break;
+            default:
+                cout << "That is not a valid input" << endl << endl;
+        }
+    }
+}
+
+
+int records(int gamesPlayed, int highestVP, int totalVP, int wins, int losses, int ties, int concedes)
+{
+    if(gamesPlayed == 0)
+    {
+        cout << "You haven't played any games, and therefore hold no records!" << endl << endl;
+        return 0;
+    }
+    else
+    {
+        cout << "You have played " << gamesPlayed << " games!" << endl;
+    }
+    
+    if(highestVP == 0)
+    {
+        cout << "Somehow, you have not accumulated ANY victory points. Conceded turn one?" << endl;
+    }
+    else
+    {
+        cout << "The most points you have earned in one game is " << highestVP << endl;
+    }
+    
+    if(totalVP == 0)
+    {
+    }
+    else if (totalVP == highestVP)
+    {
+        cout << "The total points you have accumulated across all games is... the same as the most points you have earned in one." << endl;
+        cout << "What were you expecting after playing one game?" << endl;
+    }
+    else
+    {
+        cout << "The total points you have accumulated across all games is " << totalVP << endl;
+    }
+    
+    if(wins == 0)
+    {
+        cout << "Sadly, you have yet to win a game. Keep trying!" << endl;
+    }
+    else
+    {
+        cout << "You have won " << wins << " games so far. Keep it up!" << endl;
+    }
+        
+    if(losses == 0 && wins > 0)
+    {
+        cout << "You haven't lost one yet! Keep it up!" << endl;
+    }
+    else if(losses > 0)
+    {
+        cout << "You have lost " << losses << " games so far." << endl;
+    }
+    
+    if(concedes == 0)
+    {
+    }
+    else
+    {
+        cout << concedes << " of these losses were concedes." << endl;
+    }
+        
+    if(ties == 0)
+    {
+    }
+    else
+    {
+        cout << "My records show that you have actually tied " << ties << " games." << endl;
+        cout << "Ties are very rare, probably even cooler than wins!" << endl;
+    }
+    
+    cout << endl;
+    
+    return 8;
+}
+
+
+int credits()
+{
+    cout << "This game was designed and programmed by Ryan McPartlan during December, 2015." << endl;
+    cout << "It was created using concepts from CMPT 238: Discrete structures, taught by Dr.Agrawal at Manhattan College." << endl;
+    cout << "Special thanks to Luke Mcpartlan, Paul Revelo, and Chewy McPartlan for making the credits look more legit." << endl;
+    cout << "Production babies: none"<< endl;
+    cout << "The creation of this game supported one job and ~20 hours of work. Piracy hurts real people." << endl << endl;
+    return leaveChoice();
+}
+
+
+void sayBye(int gamesPlayed, int highestVP, int wins, int losses, int ties)
+{
+    if (gamesPlayed == 0)
+        cout << "Leaving already? You didn't even play any games! What the heck!" << endl;
+    else if(highestVP > 200)
+        cout << "Your high score is really high!" << endl;
+    else if (ties > 0)
+        cout << "Bye bye bye, and gratz on the tie!" << endl;
+    else if (wins > losses)
+        cout << "Quitting while you're ahead? Good plan." << endl;
+    else if (losses > wins)
+        cout << "More losses than wins? Well, at least you didn't rage quit!" << endl;
+}
+
+
+int leaveChoice()
+{
+    int leave;
+    
+    cout << "Input 0 to exit the program, or any other number to return to the menu." << endl;
+	cout << "I want to...";
+    cin >> leave;
+    cout << endl;
+    
+    return leave;
+}
+
+
+void shuffle(CARD shuffler[])
+{
+	for(int i = 0; i < 54; i++)
+	{
+		int randomIndex = rand() % 54;
+		cardSwap(shuffler[i], shuffler[randomIndex]);
+	}
+}
+
+
+void cardSwap(CARD& first, CARD& second)
+{
+	CARD temp = first;
+	first = second;
+	second = temp;
+}
+
+
+void draw(CARD playerHand[], CARD compHand[], CARD placeholder, stack<CARD>& deck, string& gameOn)
+{
+	for(int i = 0; i < 5; i++)
+	{
+		if(playerHand[i].name == placeholder.name)
+		{
+			if(deck.empty())
+			{
+				gameOn = "false";
+				break;
+			}
+			else
+			{
+				playerHand[i] = deck.top();
+		        cout << (i + 1) << ". The " << deck.top().name << endl;
+				deck.pop();
+			}
+		}
+		else
+		 cout << (i + 1) << ". The " << playerHand[i].name << " (returned to hand.) " << endl;
+
+
+		if(compHand[i].name == placeholder.name)
+		{
+			if(deck.empty())
+			{
+				gameOn = "false";
+				break;
+			}
+			else
+			{
+				compHand[i] = deck.top();
+				deck.pop();
+			}
+		}
+	}
+}
+
+
+void addToArmy(int number, CARD playerHand[], CARD compHand[], CARD placeholder, queue<CARD>& playerArmy, queue<CARD>& compArmy)
+{
+	if(playerHand[number].name != placeholder.name)
+	{
+		cout << playerHand[number].name << " successfully added to army in position " << (playerArmy.size() + 1) << "." << endl;
+		playerArmy.push(playerHand[number]);
+		playerHand[number] = placeholder;
+		compArmy.push(compHand[number]);
+		compHand[number] = placeholder;
+	}
+	else
+		cout << "You have already used card " << (number + 1) << ". No takesies backsies, sorry!" << endl;
+}
+
+
+void resolveRound(CARD playerHand[], CARD compHand[], CARD placeholder, queue<CARD>& playerArmy, queue<CARD>& compArmy, int& playerCoinVP, int& compCoinVP, stack<CARD>& playerCapture, stack<CARD>& compCapture, stack<CARD>& playerGrave, stack<CARD>& compGrave)
+{
+	CARD roundArray[10];
+	int playerAttack = 0;
+	int compAttack = 0;
+	int playerTempCoins = 1;
+	int compTempCoins = 1;
+	int playerTempSwords = 1;
+	int compTempSwords = 1;
+
+
+	//Position loop
+	for(int position = 0; position < 5; position++)
+	{
+		bool jokes = false;
+		CARD playerCard;
+		CARD compCard;
+		int go;
+
+
+		if(playerArmy.front().name == "Joker" && compArmy.front().name == "Joker")
+		{
+			cout << "Both players reveal jokers! The jokers swap positions with each other, and swap back! They both have 0 value, so we can move on!" << endl;
+			jokes = true;
+		}
+		else if(playerArmy.front().name == "Joker" || compArmy.front().name == "Joker")
+		{
+			playerCard = compArmy.front();
+			compCard = playerArmy.front();
+			cout << "A player reveals a joker, and it swaps positions with the other players card!" << endl << endl;
+		}
+		else
+		{
+			playerCard = playerArmy.front();
+			compCard = compArmy.front();
+		}
+
+
+		playerArmy.pop();
+		compArmy.pop();
+		roundArray[position] = playerCard;
+		roundArray[position + 5] = compCard; 
+
+
+		if(!jokes)
+		{
+			if(position == 0)
+				cout << "Your 1st card is the " << playerCard.name << endl;
+			else if (position == 4)
+				cout << "Your last card is the " << playerCard.name << endl;
+			else
+				cout << "Your next card is the " << playerCard.name << endl;
+
+
+			cout << "It has a value of " << playerCard.value << endl; 
+			if(position == 0)
+			{
+				cout << "As it is in the 1st position, it contributes twice this value to your attack, for a total of " << (playerCard.value * 2) << endl;
+				playerAttack += playerCard.value*2;
+			}
+			else if(position == 3)
+			{
+				int rangerAttack = (playerCard.value - 7);
+				if(rangerAttack < 1)
+					rangerAttack = 1;
+				cout << "As it is in the 4th position, it contributes 7 less to your attack, to a minimum of one, for a total of " << rangerAttack << " damage." << endl;
+				playerAttack += rangerAttack;
+			}
+			else if (position == 4)
+			{
+				cout << "As your armies commander, this card contributes no direct damage." << endl;
+			}
+			else
+			{
+				cout << "It contributes this value to your attack." << endl;
+				playerAttack += playerCard.value;
+			}
+
+
+			if(playerCard.special == "Coins")
+			{
+				playerCoinVP += playerTempCoins;
+				cout << "As a Coins card, it contributes " << playerTempCoins << " to your victory points." << endl;
+				playerTempCoins += 1;
+				cout << "The next coin card you reveal will add " << playerTempCoins << " to your victory points." << endl;
+			}
+			else if(playerCard.special == "Coins")
+			{
+				playerAttack += playerTempSwords;
+				cout << "As a Swords card, it contributes " << playerTempSwords << " to your attack." << endl;
+				playerTempCoins += 1;
+				cout << "The next coin card you reveal will add " << playerTempSwords << " to your attack." << endl;
+			}
+			else if(playerCard.special == "RoyalCoins")
+			{
+				playerCoinVP += (5 - position);
+				compCoinVP -= (5 - position);
+				playerTempCoins += 1;
+				cout << "Your royal Coin card steals " << (5 - position) << " from your opponent." << endl;
+			}
+			else if(playerCard.special == "RoyalSkulls" && !playerGrave.empty())
+			{
+			    playerAttack += playerGrave.top().value;
+			    cout << "The royal Skulls card you played reveals the " << playerGrave.top().name << " from the top of its graveyard and adds its value (" << playerGrave.top().value << ") to its attack!" << endl;
+			}
+			else if(playerCard.special == "RoyalSkulls")
+			    cout << "Your graveyard is empty, so this Royal skulls card is unable to perform its special ability!" << endl;
+			else if(playerCard.special == "RoyalSwords")
+			{
+				playerAttack += playerTempSwords * 2;
+				playerTempSwords += 1;
+				cout << "Your royal Swords card gains double benefit from the swords bonus, adding " << (playerTempSwords * 2) << " to your attack!" << endl;
+			}
+			else if(playerCard.special == "RoyalTricks")
+			{
+				if(compAttack > playerAttack*3)
+				{
+					cout << "The trap is sprung! By baiting them in, you have surely turned the tide of battle! +30 attack!" << endl;
+					playerAttack += 30;
+				}
+				else
+					cout << "The trap of this Royal Trick card fails, as you  currently do not have less than 1/3rd of your enemies attack." << endl;
+			}
+
+
+			cout << endl;
+
+
+			//START OF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPC
+			if(position == 0)
+				cout << "The enemie's 1st card is the " << compCard.name << endl;
+			else if (position == 4)
+				cout << "The enemie's last card is the " << compCard.name << endl;
+			else
+				cout << "The enemie's next card is the " << compCard.name << endl;
+
+
+			cout << "It has a value of " << compCard.value << endl; 
+			if(position == 0)
+			{
+				cout << "As it is in the 1st position, it contributes twice this value to their attack, for a total of " << (compCard.value * 2) << endl;
+				compAttack += compCard.value*2;
+			}
+			else if(position == 3)
+			{
+				int rangerAttack = (compCard.value - 7);
+				if(rangerAttack < 1)
+					rangerAttack = 1;
+				cout << "As it is in the 4th position, it contributes 7 less to their attack, to a minimum of one, for a total of " << rangerAttack << " damage." << endl;
+				compAttack += rangerAttack;
+			}
+			else if (position == 4)
+			{
+				cout << "As the army’s commander, this card contributes no direct damage." << endl;
+			}
+			else
+			{
+				cout << "It contributes this value to their attack." << endl;
+				compAttack += compCard.value;
+			}
+
+
+			if(compCard.special == "Coins")
+			{
+				compCoinVP += compTempCoins;
+				cout << "As a Coins card, it contributes " << compTempCoins << " to their victory points." << endl;
+				compTempCoins += 1;
+				cout << "The next coin card they reveal will add " << compTempCoins << " to their victory points." << endl;
+			}
+			else if(compCard.special == "Coins")
+			{
+				compAttack += compTempSwords;
+				cout << "As a Swords card, it contributes " << compTempSwords << " to their attack." << endl;
+				compTempCoins += 1;
+				cout << "The next coin card they reveal will add " << compTempSwords << " to their attack." << endl;
+			}
+			else if(compCard.special == "RoyalCoins")
+			{
+				compCoinVP += (5 - position);
+				playerCoinVP -= (5 - position);
+				compTempCoins += 1;
+				cout << "The royal Coin card steals " << (5 - position) << " victory points from you!" << endl;
+			}
+			else if(compCard.special == "RoyalSwords")
+			{
+				compAttack += compTempSwords * 2;
+				compTempSwords += 1;
+				cout << "The royal Swords card gains double benefit from the swords bonus, adding " << (playerTempSwords * 2) << " to their attack!" << endl;
+			}
+			else if(compCard.special == "RoyalSkulls" && !compGrave.empty())
+			{
+			    compAttack += compGrave.top().value;
+			    cout << "The royal Skulls card your opponent plays reveals the " << compGrave.top().name << " from the top of it's graveyard and adds its value (" << compGrave.top().value << ") to its attack!" << endl;
+			}
+			
+			else if(compCard.special == "RoyalSkulls")
+			    cout << "The enemy graveyard is empty, so this Royal skulls card is unable to perform its special ability!" << endl;
+			else if(compCard.special == "RoyalTricks")
+			{
+				if(playerAttack > compAttack*3)
+				{
+					cout << "The enemy springs a trap! Because you had more than 3 times their attack and they revealed a royal tricks card, they gain +30 attack!" << endl;
+					playerAttack += 30;
+				}
+				else
+					cout << "The trap of this Royal Trick card fails, as your enemy currently does not have less than 1/3rd of your attack." << endl;
+			}   //END OF NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPCF NPC NPC
+
+
+			cout << endl;
+			cout << "You currently have " << playerAttack << " attack!" << endl;
+			cout << "The NPC currently has " << compAttack << " attack!" << endl;
+			cout << endl;
+			cout << "Input any integer to continue...";
+			cin >> go;
+			cout << endl;
+		}
+	}
+
+
+	cout << "Your final attack for this round is " << playerAttack << endl;
+	cout << "The computers final attack this round is " << compAttack << endl;
+
+
+	playerGrave.push(roundArray[0]);
+	compGrave.push(roundArray[5]);
+	roundArray[0] = placeholder;
+	roundArray[5] = placeholder;
+
+
+	if(playerAttack > compAttack)
+	{
+		int difference = (playerAttack - compAttack);
+
+
+		cout << "You have won the round!" << endl;
+		cout << "Both of cards in the first position are killed." << endl;
+
+
+        //Position 1 resolution
+		if(difference < 3 && roundArray[6].suit == "Tricks")
+			cout << "The nimble trickster escapes death! " << roundArray[6].name << endl;
+		else if (difference < 5)
+		{
+			cout << "You did not win enough to capture the card in the second position, but it dies." << endl;
+			compGrave.push(roundArray[6]);
+			roundArray[6] = placeholder;
+		}
+		else if (difference < 8 && roundArray[6].suit == "Tricks")
+		{
+			cout << "The clever trickster dies to escape capture!" << endl;
+			compGrave.push(roundArray[6]);
+			roundArray[6] = placeholder;
+		}
+		else
+		{
+			cout << "You have dealt enough damage to capture the card in your opponent's 2nd position, the " << roundArray[6].name << endl; 
+			playerCapture.push(roundArray[6]);
+			roundArray[6] = placeholder;
+		}
+		
+		//Position 2 resolution
+		if(difference < 5)
+		    cout << "You did not deal enough damage to affect the card in position 3." << endl;
+		else if(difference < 8 && roundArray[7].suit == "Tricks")
+		    cout << "The clever trickster card escapes death!" << endl;
+		else if(difference < 10)
+		{
+		    cout << "The card in the enemies 3rd position succumbs to their wounds!" << endl;
+		    compGrave.push(roundArray[7]);
+			roundArray[7] = placeholder;
+		}
+		else if(difference < 13)
+		{
+		    cout << "The Trickster dies to escape capture!" << endl;
+		    compGrave.push(roundArray[7]);
+			roundArray[7] = placeholder;
+		}
+		else
+		{
+		    cout << "You have dealt enough damage to capture the enemy in the 3rd position!" << endl;
+		    playerCapture.push(roundArray[7]);
+			roundArray[7] = placeholder;
+		}
+		
+		//Position 4 resolution
+		if(difference < 10)
+		    cout << "You did not deal enough damage to affect the card in position 4." << endl;
+		else if(difference < 13 && roundArray[8].suit == "Tricks")
+		    cout << "The clever trickster card in position 4 escapes death!" << endl;
+		else if(difference < 15)
+		{
+		    cout << "The card in the enemy's 4th position succumbs to their wounds!" << endl;
+		    compGrave.push(roundArray[8]);
+			roundArray[8] = placeholder;
+		}
+		else if(difference < 18)
+		{
+		    cout << "The trickster card in position 4 dies to escape capture!" << endl;
+		    compGrave.push(roundArray[8]);
+			roundArray[8] = placeholder;
+		}
+		else
+		{
+		    cout << "You have dealt enough damage to capture the enemy in the 4th position!" << endl;
+		    playerCapture.push(roundArray[8]);
+			roundArray[8] = placeholder;
+		}
+		
+		cout << "The commanders in position 5 cannot be killed or captured. " << endl;
+	}
+	else if (playerAttack < compAttack)
+	{
+	    int difference = (compAttack - playerAttack);
+
+
+		cout << "Your opponent has won the round!" << endl;
+		cout << "Both of cards in the first position are killed." << endl;
+
+
+        //Position 1 resolution
+		if(difference < 3 && roundArray[1].suit == "Tricks")
+			cout << "The nimble trickster in your 2nd position escapes death! " << roundArray[1].name << endl;
+		else if (difference < 5)
+		{
+			cout << "Your opponent did not win enough to capture the card in the second position, but it dies." << endl;
+			playerGrave.push(roundArray[1]);
+			roundArray[1] = placeholder;
+		}
+		else if (difference < 8 && roundArray[1].suit == "Tricks")
+		{
+			cout << "The clever trickster in position 2 dies to escape capture!" << endl;
+			playerGrave.push(roundArray[1]);
+			roundArray[1] = placeholder;
+		}
+		else
+		{
+			cout << "Your opponent  have dealt enough damage to capture the card in your 2nd position, the " << roundArray[1].name << endl; 
+			compCapture.push(roundArray[1]);
+			roundArray[1] = placeholder;
+		}
+		
+		//Position 2 resolution
+		if(difference < 5)
+		    cout << "Your opponent did not deal enough damage to affect the card in position 3." << endl;
+		else if(difference < 8 && roundArray[2].suit == "Tricks")
+		    cout << "The clever trickster card escapes death!" << endl;
+		else if(difference < 10)
+		{
+		    cout << "The card in your 3rd position succumbs to their wounds!" << endl;
+		    playerGrave.push(roundArray[2]);
+			roundArray[2] = placeholder;
+		}
+		else if(difference < 13)
+		{
+		    cout << "The Trickster in position 3 dies to escape capture!" << endl;
+		    playerGrave.push(roundArray[2]);
+			roundArray[2] = placeholder;
+		}
+		else
+		{
+		    cout << "The card in your 3rd position was captured, the " << roundArray[2].name << endl;
+		    compCapture.push(roundArray[2]);
+			roundArray[2] = placeholder;
+		}
+		
+		//Position 4 resolution
+		if(difference < 10)
+		    cout << "The card in position 4 was unaffected." << endl;
+		else if(difference < 13 && roundArray[3].suit == "Tricks")
+		    cout << "The clever trickster card in position 4 escapes death!" << endl;
+		else if(difference < 15)
+		{
+		    cout << "The card in your 4th position succumbs to their wounds!" << endl;
+		    playerGrave.push(roundArray[3]);
+			roundArray[3] = placeholder;
+		}
+		else if(difference < 18)
+		{
+		    cout << "The trickster card in position 4 dies to escape capture!" << endl;
+		    playerGrave.push(roundArray[3]);
+			roundArray[3] = placeholder;
+		}
+		else
+		{
+		    cout << "The card in your 4th position has been captured, the " << roundArray[3].name << endl;
+		    playerCapture.push(roundArray[3]);
+			roundArray[3] = placeholder;
+		}
+		
+		cout << "The commanders in position 5 cannot be killed or captured. " << endl;
+	}
+	else
+	{
+		cout << "The round is a tie!" << endl;
+		cout << "Both cards in the first position are killed, but nothing else occurs." << endl;
+	}
+
+
+	cout << "The remaining cards are returned to their players hands, and each player draws for the next round!" << endl;
+		
+	int handCount = 0;
+	for(int i = 0; i < 5; i++)
+	{
+	    if(roundArray[i].name != placeholder.name)
+	    {
+	        playerHand[handCount] = roundArray[i];
+	        roundArray[i] = placeholder;
+	        handCount += 1;
+	    }
+	}
+	
+	
+	handCount = 0;
+	for(int i = 0; i < 5; i++)
+	{
+	    if(roundArray[i+5].name != placeholder.name)
+	    {
+	        compHand[handCount] = roundArray[i+5];
+	        roundArray[i+5] = placeholder;
+	        handCount += 1;
+	    }
+	}
+	
+	cout << endl;
+}
+
+
+void resolveGame(stack<CARD>& playerGrave, stack<CARD>& compGrave, stack<CARD>& playerCapture, stack<CARD>& compCapture, int playerCoinVP, int compCoinVP, int& highestVP, int& totalVP,int& wins, int& losses, int& ties, string gameOn)
+{
+    int playerVP = 0;
+    int compVP = 0;
+    CARD playerCaptureArray[50];
+    CARD compCaptureArray[50];
+    CARD playerGraveArray[50];
+    CARD compGraveArray[50];
+    int playerCaptured = playerCapture.size();
+    int compCaptured = compCapture.size();
+    int playerDead = playerGrave.size();
+    int compDead = compGrave.size();
+    
+    
+    for(int i = 0; i < playerCaptured; i++)
+    {
+        playerVP += playerCapture.top().value;
+        playerCaptureArray[i] = playerCapture.top();
+        playerCapture.pop();
+    }
+    
+    cout << "You have earned " << playerVP << " victory points from your capture pile!" << endl;
+    playerVP += playerCoinVP;
+    cout << "You have earned a total of " << playerCoinVP << " VP from coin cards! (Counting any VP stolen from you.)" << endl;
+    cout << "This gives you a current total VP of " << playerVP << "!" << endl;
+    
+    for(int i = 0; i < playerDead; i++)
+    {
+        playerVP -= 2;
+        if(playerGrave.top().suit == "Skulls")
+            playerVP += 4;
+        playerGraveArray[i] = playerGrave.top();
+        playerGrave.pop();
+    }
+    cout << "Factoring in Graveyard penalties and Skulls bonuses, you have earned a total of " << playerVP <<  " victory points!" << endl << endl;
+    
+    for(int i = 0; i < compCaptured; i++)
+    {
+        compVP += compCapture.top().value;
+        compCaptureArray[i] = compCapture.top();
+        compCapture.pop();
+    }
+    
+    cout << "The enemy has earned a total of " << compVP << " from their victory pile." << endl;
+    compVP += compCoinVP;
+    cout << "The enemy has earned a total of " << compCoinVP << " VP from Coin cards, for a current total of " << compVP << "!" << endl;
+    
+    for(int i = 0; i < compDead; i++)
+    {
+        compVP -= 2;
+        if(compGrave.top().suit == "Skulls")
+            compVP += 4;
+        compGraveArray[i] = compGrave.top();
+        compGrave.pop();
+    }
+    cout << "Factoring in Graveyard penalties and Skulls bonuses, they have earned a total of " << compVP <<  " victory points!" << endl << endl;
+    
+    totalVP += playerVP;
+    
+    if(playerVP > highestVP)
+        highestVP = playerVP;
+    
+    if(playerVP > compVP)
+    {
+        cout << "YOU WIN! CONGRATULATIONS!" << endl << endl;
+        wins += 1;
+    }
+    else if(compVP < playerVP)
+    {
+        cout << "You have lost... better luck next time!" << endl;
+        losses += 1;
+    }
+    else
+    {
+        cout << "A tie? Wow! Ties are really rare! That's actually pretty cool..." << endl;
+        ties += 1;
+    }
+    
+    bubble_sort(playerCaptureArray, playerCaptured);
+	insertion_sort(compCaptureArray, compCaptured);
+	selection_sort(playerGraveArray, playerDead);
+	quickSort(compGraveArray, 0, compDead);
+    
+    while(gameOn == "false")
+	{
+		int lastChoice = 0;
+
+
+		cout << "Press 1 to return to the menu, to view records or play again." << endl;
+		cout << "Press 2 to view the cards in your victory pile, sorted lowest/highest value. (Bubble sort)" << endl;
+		cout << "Press 3 to view the cards in your opponent's victory pile, sorted lowest/highest value. (Insertion sort.)" << endl;
+		cout << "Press 4 to view the cards in your graveyard, sorted lowest/highest value. (Selection sort.)" << endl;
+		cout << "Press 5 to view the cards in your opponent's graveyard, sorted lowest/highest value. (Quick sort)" << endl;
+		cout << "I want to...";
+		cin >> lastChoice;
+		cout << endl;
+
+
+		switch(lastChoice)
+		{
+			case 1:
+				gameOn = "reset";
+				cout << "Returning to the menu!";
+				break;
+			case 2:
+				print_array(playerCaptureArray, playerCaptured);
+				break;
+			case 3:
+				print_array(compCaptureArray, compCaptured);
+				break;
+			case 4:
+				print_array(playerGraveArray, playerDead);
+				break;
+			case 5:
+			    print_array(compGraveArray, compDead);
+				break;
+		}
+	}
+}
