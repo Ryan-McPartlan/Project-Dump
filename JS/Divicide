@@ -1,0 +1,2636 @@
+ //Initializations
+var currentScene = 1;
+var volume = 3;
+var difficulty = 2;
+var instructions = 0;
+var check1 = true;
+var check2 = false;
+var displayAchieve = 1;
+var encyclopediaType = 1;
+var encyclopediaPage = 1;
+var keysDown = [];
+var projectiles = [];
+var enemyProjectiles = [];
+var pauseDelay = 0;
+var buffs = [];
+var running = false;
+var pauseDisplay = 0;
+var pauseOption = 0;
+var objectsOnMap = [];
+var abilityQ = 1;
+var abilitySp = 1;
+var ability1 = 1;
+var ability2 = 1;
+var ability3 = 1;
+var ability4 = 1;
+var abilityE = 1;
+var abilityPsv = 1;
+
+//PLAYER
+var player = {
+    x:200,
+    y:200,
+    radius:10,
+    speed:1.2
+};
+var currentHealth = 96;
+var maxHealth = 100;
+var shield = 98;
+var drawPlayer = function(){
+    fill(225, 172, 150);
+    ellipse(player.x,player.y,15,15);
+}; 
+var die = function(){
+    currentHealth = 100;
+    maxHealth = 100;
+    shield = 100;
+    player.x = 200;
+    player.y = 200;
+    projectiles = [];
+};
+var takeDamage = function(creature,damageValue){
+    if (creature === player && shield > 0){
+        if (damageValue > shield){
+            currentHealth -= damageValue - shield;
+            shield -= damageValue;
+            shield = 0;
+        }
+        else{
+            shield -= damageValue;
+        }
+    }
+    else if (creature === player && shield === 0){
+        currentHealth -= damageValue;
+        if (currentHealth <= 0){
+            currentHealth = 0;
+            die();
+        }
+    }
+};
+var movePlayer = function(){
+    var ran = false;
+    if ((keysDown[87]||keysDown[38]) && player.y >10){
+        player.y -= player.speed;
+        if(running){ran = true;}
+    }
+    if (keysDown[83]||keysDown[40] && player.y <300){
+        player.y += player.speed;
+        if(running){ran = true;}
+    }
+    if (keysDown[65]||keysDown[37] && player.x >10){
+        player.x -= player.speed;
+        if(running){ran = true;}
+    }
+    if (keysDown[68]||keysDown[39] && player.x < 390){
+        player.x += player.speed;
+        if(running){ran = true;}
+    }
+    if (ran === true){takeDamage(player,1);}
+    ran = false;
+};
+
+//Special functions
+var cursive = function(string,x,y,width,height){
+    textFont(createFont("cursive"));
+    text(string,x,y,width,height);
+    textFont(createFont(""));
+};
+var changeScene = function(number){
+    currentScene = number;
+};
+var keyPush = function(key,UIthing){
+    if(keysDown[key]){
+        UIthing.activate();
+    }
+};
+
+//Projectile code
+var correctX = function(targetX,originX){
+    if (targetX-originX < 0){
+        return -1;
+    }
+    else{return 1;}
+};
+var correctY = function(targetY,originY){
+    if (targetY-originY < 0){
+        return -1;
+    }
+    else {return 1;}
+};
+var calculateXTrajectory = function(targetX,targetY,originX,originY){
+    if (targetX - originX !==0){
+        return correctX(targetX,originX)*cos(atan(abs((targetY - originY)/(targetX - originX))));
+    }
+    else{
+        return 0;
+    }
+};
+var calculateYTrajectory = function(targetX,targetY,originX,originY){
+        return correctY(targetY,originY)*sin(atan(abs((targetY - originY)/(targetX-originX))));
+};
+var calculateDistance = function(x1,x2,y1,y2){
+    return abs(sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)));
+};
+var Projectile = function(config){
+    this.x = config.x || player.x;
+    this.y = config.y || player.y;
+    this.xTrajectory = config.xTrajectory||calculateXTrajectory(mouseX,mouseY,player.x,player.y);
+    this.yTrajectory = config.yTrajectory||calculateYTrajectory(mouseX,mouseY,player.x,player.y);
+    this.speed = config.speed || 5;
+    this.size = config.size || 5;
+};
+var fireSpam = function(){
+    projectiles.push(new Projectile({}));
+};
+var projectileUpdate = function(){
+    for (var i = 0; i < projectiles.length; i++){
+        projectiles[i].x += projectiles[i].xTrajectory*projectiles[i].speed;
+        projectiles[i].y += projectiles[i].yTrajectory*projectiles[i].speed;
+    }
+};
+var drawProjectiles = function(){
+    for (var i = 0; i < projectiles.length; i++){
+        if(projectiles[i] === 0){
+        }
+        else if(projectiles[i].x > width || projectiles[i].x < 0 || projectiles[i].y > height || projectiles[i].y < 0){
+            projectiles[i] = 0;
+        }
+        fill(9, 26, 217);
+        ellipse(projectiles[i].x, projectiles[i].y, projectiles[i].size,projectiles[i].size);
+    }
+    for(var i = 0; i < projectiles.length; i++){
+        if (projectiles[i] !== 0){break;}
+        else if (i === projectiles.length -1){
+            projectiles = [];
+        }
+    }
+};
+
+//BUTTON MAKING MAGIC CODE
+var Button = function(config) {
+    this.x = config.x || 0;
+    this.y = config.y || 0;
+    this.width = config.width || 50;
+    this.height = config.height || 50;
+    this.color = config.color || function() {fill(138,4,27);};
+    this.text = config.text || "<--";
+    this.onClick = config.onClick || function(){};
+    this.textSize = config.textSize || 30;
+    this.mouseOver = config.mouseOver || function(){fill(97, 19, 43);};
+    this.messageConfig = config.messageConfig || {
+        s:0,
+        m:" ",
+        x:0,
+        y:0,
+        w:0,
+        h:0
+    };
+};
+Button.prototype.draw = function(){
+    if (this.isMouseOver()){
+        this.mouseOver();
+    }
+    else {
+        this.color();
+    }
+    rect(this.x,this.y,this.width,this.height,6);
+    fill(240,240,5);
+    textSize(this.textSize);
+    textAlign(CENTER,CENTER);
+    text(this.text,this.x + this.width/2,this.y+this.height/2);
+    textAlign(LEFT,TOP);
+};
+Button.prototype.isMouseOver = function(){
+    return(mouseX > this.x &&
+    mouseX < (this.x + this.width) &&
+    mouseY > this.y && 
+    mouseY < (this.y +this.height));
+};
+Button.prototype.click = function(){
+    if (this.isMouseOver()){
+        this.onClick();
+    }
+};
+Button.prototype.message = function(size,message,x,y,width,height){
+    if (this.isMouseOver()){
+        textSize(size);
+        cursive(message,x,y,width,height);
+    }
+};
+
+//Achievement making magic code
+var Achievment = function(config){
+    this.number = config.number;
+    this.title = config.title || "???";
+    this.progress = config.progress || 0;
+    this.total = config.total || 1;
+    this.earned = config.earned || "Unstarted";
+    this.flavorText = config.flavorText || "I must continue my quest.";
+    this.criteria = config.criteria || "Testing testing";
+    this.reward = config.reward || "Reward: 5% increased critical strike chance.";
+};
+Achievment.prototype.draw = function() {
+    if(this.number === displayAchieve){
+        fill(194,167,85);
+        rect(50,90,300,50);
+        rect(50,140,100,150);
+        rect(150,140,100,150);
+        rect(250,140,100,150);
+        fill(0, 0, 0);
+        textSize(22);
+         cursive(this.title,50,90,300,50);
+        textSize(15);
+         cursive(this.flavorText,50,140,100,150);
+         cursive(this.criteria,150,140,100,150);
+         cursive(this.reward,250,140,100,150);
+         this.progressBar();
+    }
+};
+Achievment.prototype.progressBar = function() {
+    fill(255, 0, 0);
+    rect(50,290,300,20);
+    fill(0, 0, 0);
+    textSize(15);
+    if (this.total > 1){
+        fill(40, 191, 10);
+        rect(50,290,300 * this.progress / this.total,20);
+        fill(0, 0, 0);
+        cursive(this.progress +"/" + this.total,50,277,300,40);
+    }
+    else if (this.total === this.progress){
+        cursive("Complete",50,277,300,40);
+    }
+    else{
+        cursive("Incomplete",50,277,300,40);
+    }
+};
+
+var UIelement = function(config){
+    this.x = config.x || 0;
+    this.y = config.y || 330;
+    this.width = config.width || 50;
+    this.height = config.height || 50;
+    this.maxCD = config.maxCD || 240;
+    this.currentCD = config.currentCD || 0;
+    this.image = config.image || "avatars/leaf-green";
+    this.imageWidth = config.imageWidth || 50;
+    this.imageHeight = config.imageHeight || 50;
+    this.imageXAdjust= config.imageXAdjust || 0;
+    this.imageYAdjust = config.imageYAdjust || 0;
+    this.onActivate = config.onActivate || function(){};
+};
+UIelement.prototype.onCooldown = function(){
+    return(this.currentCD > 0);
+};
+UIelement.prototype.draw = function() {
+    if (this.onCooldown()){
+        fill(97, 19, 43);
+        rect(this.x,this.y,this.width,this.height);
+        image(getImage("avatars/leaf-grey"),this.x,this.y,50,50);
+        fill(250, 225, 0);
+        text(Math.ceil(this.currentCD/30),this.x+20,this.y+15,50,50);
+        this.currentCD -= 1;
+    }
+    else{
+        fill(138,4,27);
+        rect(this.x,this.y,this.width,this.height);
+        image(getImage(this.image),this.x+(this.imageXAdjust),this.y+this.imageYAdjust,this.imageWidth,this.imageHeight);
+    }
+};
+UIelement.prototype.activate = function(){
+    if(this.onCooldown()){}
+    else {
+        this.onActivate();
+        this.currentCD = this.maxCD;
+    }
+};
+
+var buff = function(config){
+    this.name = config.name || "n/a";
+    this.maxDuration = config.maxDuration || 200;
+    this.remainingDuration = 0;
+    this.effect = config.effect || function(){};
+};
+buff.prototype.draw = function(spot) {
+    fill(171, 15, 15);
+    rect(spot,290,20,20,5);
+    fill(210, 224, 20);
+    if (this.remainingDuration !== "n/a"){
+        text(Math.ceil(this.remainingDuration/30),spot+1,293,20,20);
+    }
+};
+
+//buffs
+var speedPotienBuff = new buff({
+    maxDuration:300,
+    effect: function(){
+        if (speedPotienBuff.remainingDuration === speedPotienBuff.maxDuration){
+            player.speed += 2;
+        }
+        else if(this.remainingDuration === 0){
+            player.speed -= 2;
+        }
+        else{}
+    }
+});
+var runToggle = new buff({
+    remainingDuration:"n/a",
+    name: "runToggle",
+    effect: function(){
+    }
+});
+
+//UI elements
+var artifactUI = new UIelement({
+    maxCD:150,
+    onActivate: function(bulletCircle){
+        for (var i = 1; i<13;i++){
+            projectiles.push(new Projectile({
+                xTrajectory:cos(30*i),
+                yTrajectory:sin(30*i)
+            }));
+        }
+    },
+        //image:"cute/Key",
+        //imageWidth:40,
+        //imageHeight:61,
+        //imageXAdjust:5,
+        //imageYAdjust:-11
+    });
+var specialUI = new UIelement({
+    x:50,
+    maxCD:180,
+    onActivate: function(Vshot){
+        for (var i = 1; i<=5;i++){
+            projectiles.push(new Projectile({
+                xTrajectory: calculateXTrajectory(mouseX,mouseY,player.x,player.y)*random(1.5,3)+random(-0.5,0.5),
+                yTrajectory: calculateYTrajectory(mouseX,mouseY,player.x,player.y)*random(1.5,3)+random(-0.5,0.5),
+                speed: 2
+            }));
+        }
+    },
+    //image:"cute/Star",
+    //imageWidth:40,
+    //imageHeight:61,
+    //imageXAdjust:5,
+    //imageYAdjust:-11,
+});
+var ability1UI = new UIelement({
+        x:100,
+        maxCD:30,
+        onActivate: function(){
+            if (calculateDistance(mouseX,player.x,mouseY,player.y) > 100){
+                player.x += 100*calculateXTrajectory(mouseX,mouseY,player.x,player.y);
+                player.y += 100*calculateYTrajectory(mouseX,mouseY,player.x,player.y);
+            }
+            else{
+                player.x = mouseX; 
+                player.y = mouseY;
+            }
+        },
+        //image:"avatars/leaf-blue"
+    });
+var ability2UI = new UIelement({
+        x:150,
+        //image:"avatars/leaf-red",
+    });
+var ability3UI = new UIelement({
+        x:200,
+        //image:"avatars/leaf-yellow"
+    });
+var ability4UI = new UIelement({
+        x:250,
+        maxCD:30,
+        onActivate: function(){
+            if (running){
+                running = false;
+                for (var i = 0;i < buffs.length; i++){
+                    if (buffs[i].name === "runToggle"){
+                        buffs[i] = 0;
+                    }
+                }
+                player.speed -= 3;
+            }
+            else{
+                runToggle.remainingDuration = "n/a";
+                buffs.push(runToggle);
+                running = true;
+                player.speed += 3;
+            }
+        }
+    });
+var potienUI = new UIelement({
+        x:300,
+        maxCD:1200,
+        onActivate: function(){
+            speedPotienBuff.remainingDuration = speedPotienBuff.maxDuration;
+            buffs.push(speedPotienBuff);
+        }
+        //imageHeight:45,
+        //imageYAdjust:3,
+        //image:"space/healthheart"
+    });
+var passiveUI = new UIelement({
+        x:350,
+        //imageWidth:40,
+        //imageHeight:61,
+        //imageXAdjust:5,
+        //imageYAdjust:-10,
+        //image:"cute/TreeShort"
+    });
+
+//Achieves
+var achv1 = new Achievment({
+    number:1,
+    title:"And so it ends.",
+    flavorText:"I must finish what I started.",
+    criteria: "Criteria: Complete your primary adventure.",
+    reward: "Reward: Unlock NG+ and Gauntlet Mode"
+});
+var achv2 = new Achievment({
+        number:2,
+        title:"First Blood",
+        flavorText:"I must begin somewhere",
+        criteria: "Criteria: Defeat your first Boss enemy",
+        reward: "Reward: Random uncollected artifact."
+    });
+var achv3 = new Achievment({
+        number:3,
+        total: 1000,
+        title:"A massive blow",
+        flavorText:"Boom, headshot.",
+        criteria: "Criteria: Deal 1000 damage with a single attack.",
+        reward: "Reward: 5% increased critical damage"
+    });
+var achv4 = new Achievment({
+        number:4,
+        total: 5,
+        title:"Timber!",
+        flavorText:"The bigger they are...",
+        criteria: "Defeat all Collassal Boss enemies.",
+        reward: "Reward: Certain AOE abilities can hit the same target multiple times."
+    });
+var achv5 = new Achievment({
+        number:5,
+        total:3,
+        title:"Heed my Council",
+        flavorText:"There is strength in numbers, but it is incomprable to my own.",
+        criteria: "Defeat all Council Bosses",
+        reward: "Reward: Mitotic Core (Aug)"
+    });
+var achv6 = new Achievment({
+        number:6,
+        total:4,
+        title:"",
+        flavorText:"I will overcome any obstacle.",
+        criteria: "Complete all Special Encounters.",
+        reward: "Reward: 1 second Artifact Cooldown reduction."
+    });
+var achv7 = new Achievment({
+        number:7,
+        title:"A better world",
+        flavorText:"I musn't forget... I was once a hero.",
+        criteria: "Complete all good deeds.",
+        reward: "Reward:\nNone"
+    });
+var achv8 = new Achievment({
+        number:8,
+        title:"Boss1 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 1",
+        reward: "Reward: ???"
+    });
+var achv9 = new Achievment({
+        number:9,
+        title:"Boss 2 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 2",
+        reward: "Reward: ???"
+    });
+var achv10 = new Achievment({
+        number:10,
+        title:"Boss 3 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 3",
+        reward: "Reward: ???"
+    });
+var achv11 = new Achievment({
+        number:11,
+        title:"Boss4 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 4",
+        reward: "Reward: ???"
+    });
+var achv12 = new Achievment({
+        number:12,
+        title:"Boss5 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 5",
+        reward: "Reward: ???"
+    });
+var achv13 = new Achievment({
+        number:13,
+        title:"Boss6 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 6",
+        reward: "Reward: ???"
+    });
+var achv14 = new Achievment({
+        number:14,
+        title:"Boss6 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 6",
+        reward: "Reward: ???"
+    });
+var achv15 = new Achievment({
+        number:15,
+        title:"Boss7 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 7",
+        reward: "Reward: ???"
+    });
+var achv16 = new Achievment({
+        number:16,
+        title:"Boss8 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 8",
+        reward: "Reward: ???"
+    });
+var achv17 = new Achievment({
+        number:17,
+        title:"Boss9 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 9",
+        reward: "Reward: ???"
+    });
+var achv18 = new Achievment({
+        number:18,
+        title:"Boss10 special kill",
+        flavorText:"Style points yo",
+        criteria: "Do something special vs boss 10",
+        reward: "Reward: ???"
+    });
+
+//BUTTONS
+var btn1 = new Button({
+        y:30,
+        x:30,
+        width:160,
+        height:50,
+        textSize:25,
+        text:"Play",
+        onClick: function(){changeScene(7);}
+    });
+var btn2 = new Button({
+        y:80,
+        x:30,
+        width:160,
+        height:50,
+        textSize:25,
+        text:"Options",
+        onClick: function() {changeScene(3);}
+    });
+var btn3 = new Button({
+        y:130,
+        x:30,
+        width:160,
+        height:50,
+        textSize:25,
+        text:"Instructions",
+        onClick: function() {changeScene(4);}
+    });
+var btn4 = new Button({
+        y:180,
+        x:30,
+        width:160,
+        height:50,
+        textSize:25,
+        text:"Achievments",
+        onClick: function() {changeScene(5);}
+    });
+var btn5 = new Button({
+        y:230,
+        x:30,
+        width:160,
+        height:50,
+        textSize:25,
+        text:"Encyclopedia",
+        onClick: function() {changeScene(6);}
+    });
+
+//Back Buttons
+var btnB1 = new Button({
+        onClick: function(){currentScene = 2;}
+    });
+var btnB2 = new Button({
+        onClick: function(){
+            currentScene = 2;
+            instructions = 0;
+        }
+    });
+var btnB3 = new Button({
+        onClick: function(){currentScene = 2;}
+    });
+var btnB4 = new Button({
+        onClick: function(){currentScene = 2;}
+    });
+
+//Options Buttons
+var btnO1 = new Button({
+        y:120,
+        x:190,
+        height: 30,
+        width: 30,
+        textSize:20,
+        color: function(){
+            if (volume ===1){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (volume === 1){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (volume !== 1){
+            volume -= 1; 
+            }
+        }
+    });
+var btnO2 = new Button({
+        y:120,
+        x:305,
+        height: 30,
+        width: 30,
+        textSize:20,
+        text:"-->",
+        color: function(){
+            if (volume ===4){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (volume === 4){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (volume !== 4){
+            volume += 1; 
+            }
+        }
+    });
+var btnO3 = new Button({
+        y:190,
+        x:200,
+        height: 30,
+        width: 30,
+        textSize: 25,
+        text:"E",
+        color: function(){
+            if (difficulty === 1){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            difficulty = 1;
+        },
+        mouseOver: function(){
+            if (difficulty !== 1){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnO4 = new Button({
+        y:190,
+        x:250,
+        height: 30,
+        width: 30,
+        textSize: 25,
+        text:"N",
+        color: function(){
+            if (difficulty === 2){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            difficulty = 2;
+        },
+        mouseOver: function(){
+            if (difficulty !== 2){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnO5 = new Button({
+        y:190,
+        x:300,
+        height: 30,
+        width: 30,
+        textSize: 25,
+        text:"H",
+        color: function(){
+            if (difficulty === 3){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            difficulty = 3;
+        },
+        mouseOver: function(){
+            if (difficulty !== 3){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnO6 = new Button({
+        x:190,
+        y:280,
+        text:" ",
+        onClick: function(){
+            if (check1){
+                check1 = false;
+            }
+            else{
+                check1 = true;
+            }
+        }
+    });
+var btnO7 = new Button({
+        x:300,
+        y:280,
+        text:" ",
+        onClick: function(){
+            if (check2){
+                check2 = false;
+            }
+            else{
+                check2 = true;
+            }
+        }
+    });
+
+//Instructions Buttons
+var btnI1 = new Button({
+        x:0,
+        y:350,
+        width:width/3,
+        height:50,
+        text:"Controls",
+        color: function(){
+            if (instructions === 1){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            if (instructions !== 1){
+                instructions = 1;
+            }
+            else{
+                instructions = 0;
+            }
+        },
+    });
+var btnI2 = new Button({
+        x:width/3,
+        y:350,
+        width:width/3,
+        height:50,
+        text:"Objective",
+        color: function(){
+            if (instructions === 2){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            if (instructions !== 2){
+                instructions = 2;
+            }
+            else{
+                instructions = 0;
+            }
+        },
+    });
+var btnI3 = new Button({
+        x:width*2/3,
+        y:350,
+        width:width/3,
+        height:50,
+        text:"Tips",
+        color: function(){
+            if (instructions >= 3){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        onClick: function(){
+            if (instructions !== 3){
+                instructions = 3;
+            }
+            else{
+                instructions = 0;
+            }
+        },
+    });
+var btnI4 = new Button({
+        y:300,
+        x:20,
+        height: 30,
+        width: 30,
+        textSize:20,
+        color: function(){
+            if (instructions ===3){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (instructions === 3){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (instructions > 3){
+            instructions -= 1; 
+            }
+        }
+    });
+var btnI5 = new Button({
+        y:300,
+        x:350,
+        height: 30,
+        width: 30,
+        textSize:20,
+        text: "-->",
+        color: function(){
+            if (instructions ===5){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (instructions === 5){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (instructions < 5){
+            instructions += 1; 
+            }
+        }
+    });
+
+//Achievement Buttons
+var btnAB1 = new Button({
+        x:0,
+        y:330,
+        color: function(){
+            if (displayAchieve <= 6){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve <= 6){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (displayAchieve > 6 && displayAchieve <=12){
+                displayAchieve = 6; 
+            }
+            else if (displayAchieve > 12){
+                displayAchieve = 12;
+            }
+        }
+    });
+var btnAB2 = new Button({
+        x:350,
+        y:330,
+        text:"-->",
+        color: function(){
+            if (displayAchieve > 12){
+                fill(120,120,120);
+            }
+            else{
+                fill(138, 4, 27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve > 12){
+                fill(120, 120, 120);
+            }
+            else{
+                fill(97, 19, 43);
+            }
+        },
+        onClick: function(){
+            if (displayAchieve <= 6){
+                displayAchieve = 7; 
+            }
+            else if (displayAchieve > 6 && displayAchieve <=12){
+                displayAchieve = 13;
+            }
+        }
+    });
+var btnA1 = new Button({
+        x:50,
+        y:330,
+        text:"1",
+        onClick: function(){displayAchieve = 1;},
+        color: function(){
+            if (displayAchieve === 1){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 1){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA2 = new Button({
+        x:100,
+        y:330,
+        text:"2",
+        onClick: function(){displayAchieve = 2;},
+        color: function(){
+            if (displayAchieve === 2){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 2){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA3 = new Button({
+        x:150,
+        y:330,
+        text:"3",
+        onClick: function(){displayAchieve = 3;},
+        color: function(){
+            if (displayAchieve === 3){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 3){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA4 = new Button({
+        x:200,
+        y:330,
+        text:"4",
+        onClick: function(){displayAchieve = 4;},
+        color: function(){
+            if (displayAchieve === 4){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 4){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA5 = new Button({
+        x:250,
+        y:330,
+        text:"5",
+        onClick: function(){displayAchieve = 5;},
+        color: function(){
+            if (displayAchieve === 5){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 5){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA6 = new Button({
+        x:300,
+        y:330,
+        text:"6",
+        onClick: function(){displayAchieve = 6;},
+        color: function(){
+            if (displayAchieve === 6){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 6){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA7 = new Button({
+        x:50,
+        y:330,
+        text:"7",
+        onClick: function(){displayAchieve = 7;},
+        color: function(){
+            if (displayAchieve === 7){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 7){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA8 = new Button({
+        x:100,
+        y:330,
+        text:"8",
+        onClick: function(){displayAchieve = 8;},
+        color: function(){
+            if (displayAchieve === 8){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 8){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA9 = new Button({
+        x:150,
+        y:330,
+        text:"9",
+        onClick: function(){displayAchieve = 9;},
+        color: function(){
+            if (displayAchieve === 9){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 9){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA10 = new Button({
+        x:200,
+        y:330,
+        text:"10",
+        onClick: function(){displayAchieve = 10;},
+        color: function(){
+            if (displayAchieve === 10){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 10){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA11 = new Button({
+        x:250,
+        y:330,
+        text:"11",
+        onClick: function(){displayAchieve = 11;},
+        color: function(){
+            if (displayAchieve === 11){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 11){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA12 = new Button({
+        x:300,
+        y:330,
+        text:"12",
+        onClick: function(){displayAchieve = 12;},
+        color: function(){
+            if (displayAchieve === 12){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 12){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA13 = new Button({
+        x:50,
+        y:330,
+        text:"13",
+        onClick: function(){displayAchieve = 13;},
+        color: function(){
+            if (displayAchieve === 13){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 13){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA14 = new Button({
+        x:100,
+        y:330,
+        text:"14",
+        onClick: function(){displayAchieve = 14;},
+        color: function(){
+            if (displayAchieve === 14){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 14){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA15 = new Button({
+        x:150,
+        y:330,
+        text:"15",
+        onClick: function(){displayAchieve = 15;},
+        color: function(){
+            if (displayAchieve === 15){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 15){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA16 = new Button({
+        x:200,
+        y:330,
+        text:"16",
+        onClick: function(){displayAchieve = 16;},
+        color: function(){
+            if (displayAchieve === 16){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 16){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA17 = new Button({
+        x:250,
+        y:330,
+        text:"17",
+        onClick: function(){displayAchieve = 17;},
+        color: function(){
+            if (displayAchieve === 17){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 17){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnA18 = new Button({
+        x:300,
+        y:330,
+        text:"18",
+        onClick: function(){displayAchieve = 18;},
+        color: function(){
+            if (displayAchieve === 18){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (displayAchieve !== 18){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+
+//Encyclopedia buttons
+var btnE1 = new Button({
+        x:350,
+        y:50,
+        height:60,
+        textSize:15,
+        text:"History",
+        onClick: function(){
+            encyclopediaType = 1;
+            encyclopediaPage = 1;
+        },
+        color: function(){
+            if (encyclopediaType === 1){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaType !== 1){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnE2 = new Button({
+        x:350,
+        y:110,
+        height:60,
+        textSize:12,
+        text:"Bossess",
+        onClick: function(){
+            encyclopediaType = 2;
+            encyclopediaPage = 1;
+        },
+        color: function(){
+            if (encyclopediaType === 2){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaType !== 2){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnE3 = new Button({
+        x:350,
+        y:170,
+        height:60,
+        textSize:17,
+        text:"Items",
+        onClick: function(){
+            encyclopediaType = 3;
+            encyclopediaPage = 1;
+        },
+        color: function(){
+            if (encyclopediaType === 3){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaType !== 3){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnE4 = new Button({
+        x:350,
+        y:230,
+        height:60,
+        textSize:15,
+        text:"Places",
+        onClick: function(){
+            encyclopediaType = 4;
+            encyclopediaPage = 1;
+        },
+        color: function(){
+            if (encyclopediaType === 4){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaType !== 4){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnE5 = new Button({
+        x:350,
+        y:290,
+        height:60,
+        text:"Groups",
+        textSize:15,
+        onClick: function(){
+            encyclopediaType = 5;
+            encyclopediaPage = 1;
+        },
+        color: function(){
+            if (encyclopediaType === 5){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaType !== 5){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnEP1 = new Button({
+        x:50,
+        y:330,
+        text:" ",
+        onClick: function(){encyclopediaPage = 1;},
+        color: function(){
+            if (encyclopediaPage === 1){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaPage !== 1){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnEP2 = new Button({
+        x:100,
+        y:330,
+        text:" ",
+        onClick: function(){encyclopediaPage = 2;},
+        color: function(){
+            if (encyclopediaPage === 2){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaPage !== 2){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnEP3 = new Button({
+        x:150,
+        y:330,
+        text:" ",
+        onClick: function(){encyclopediaPage = 3;},
+        color: function(){
+            if (encyclopediaPage === 3){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaPage !== 3){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnEP4 = new Button({
+        x:200,
+        y:330,
+        text:" ",
+        onClick: function(){encyclopediaPage = 4;},
+        color: function(){
+            if (encyclopediaPage === 4){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaPage !== 4){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+var btnEP5 = new Button({
+        x:250,
+        y:330,
+        text:" ",
+        onClick: function(){encyclopediaPage = 5;},
+        color: function(){
+            if (encyclopediaPage === 5){
+                fill(230,12,12);
+            }
+            else{
+                fill(138,4,27);
+            }
+        },
+        mouseOver: function(){
+            if (encyclopediaPage !== 5){
+                fill(97, 19, 43);
+            }
+            else{
+                fill(230, 12, 12);
+            }
+        }
+    });
+
+//PauseButtons
+var btnP1 = new Button({
+    y:350,
+    text:"Q",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 1;},
+});
+var btnP2 = new Button({
+    y:350,
+    x:50,
+    text:"Sp",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 2;},
+});
+var btnP3 = new Button({
+    y:350,
+    x:100,
+    text:"1",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 3;},
+});
+var btnP4 = new Button({
+    y:350,
+    x:150,
+    text:"2",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 4;},
+});
+var btnP5 = new Button({
+    y:350,
+    x:200,
+    text:"3",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 5;},
+});
+var btnP6 = new Button({
+    y:350,
+    x:250,
+    text:"4",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 6;},
+});
+var btnP7 = new Button({
+    y:350,
+    x:300,
+    text:"E",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 7;},
+});
+var btnP8 = new Button({
+    y:350,
+    x:350,
+    text:"Psv",
+    mouseOver: function(){fill(97, 19, 43); pauseOption = 8;},
+});
+
+var btnPQ1 = new Button({
+    y:300,
+    text:"1",
+    color: function(){
+        if (abilityQ === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ2 = new Button({
+    y:250,
+    text:"2",
+    color: function(){
+        if (abilityQ === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ3 = new Button({
+    y:200,
+    text:"3",
+    color: function(){
+        if (abilityQ === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ4 = new Button({
+    y:300,
+    x:50,
+    text:"1",
+    color: function(){
+        if (abilitySp === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ5 = new Button({
+    y:250,
+    x:50,
+    text:"2",
+    color: function(){
+        if (abilitySp === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ6 = new Button({
+    y:200,
+    x:50,
+    text:"3",
+    color: function(){
+        if (abilitySp === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ7 = new Button({
+    y:300,
+    x:100,
+    text:"1",
+    color: function(){
+        if (ability1 === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ8 = new Button({
+    y:250,
+    x:100,
+    text:"2",
+    color: function(){
+        if (ability1 === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ9 = new Button({
+    y:200,
+    x:100,
+    text:"3",
+    color: function(){
+        if (ability1 === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ10 = new Button({
+    y:300,
+    x:150,
+    text:"1",
+    color: function(){
+        if (ability2 === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ11 = new Button({
+    y:250,
+    x:150,
+    text:"2",
+    color: function(){
+        if (ability2 === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ12 = new Button({
+    y:200,
+    x:150,
+    text:"3",
+    color: function(){
+        if (ability2 === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ13 = new Button({
+    y:300,
+    x:200,
+    text:"1",
+    color: function(){
+        if (ability3 === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ14 = new Button({
+    y:250,
+    x:200,
+    text:"2",
+    color: function(){
+        if (ability3 === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ15 = new Button({
+    y:200,
+    x:200,
+    text:"3",
+    color: function(){
+        if (ability3 === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ16 = new Button({
+    y:300,
+    x:250,
+    text:"1",
+    color: function(){
+        if (ability4 === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ17 = new Button({
+    y:250,
+    x:250,
+    text:"2",
+    color: function(){
+        if (ability4 === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ18 = new Button({
+    y:200,
+    x:250,
+    text:"3",
+    color: function(){
+        if (ability4 === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ19 = new Button({
+    y:300,
+    x:300,
+    text:"1",
+    color: function(){
+        if (abilityE === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ20 = new Button({
+    y:250,    
+    x:300,
+    text:"2",
+    color: function(){
+        if (abilityE === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ21 = new Button({
+    y:200,
+    x:300,
+    text:"3",
+    color: function(){
+        if (abilityE === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+var btnPQ22 = new Button({
+    y:300,
+    x:350,
+    text:"1",
+    color: function(){
+        if (abilityPsv === 1){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ23 = new Button({
+    y:250,
+    x:350,
+    text:"2",
+    color: function(){
+        if (abilityPsv === 2){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+var btnPQ24 = new Button({
+    y:200,
+    x:350,
+    text:"3",
+    color: function(){
+        if (abilityPsv === 3){
+            fill(230,12,12);
+        }
+        else{
+            fill(138,4,27); 
+        }
+    },
+});
+
+//Special things
+var drawVolume = function(){
+    fill(0, 0, 0);
+    rect(215,75,2,40,5);
+    rect(245,75,2,40,5);
+    rect(275,75,2,40,5);
+    rect(305,75,2,40,5);
+    fill(255, 0, 0);
+    noStroke();
+    rect(185+(30*volume),75,3,41,5);
+    stroke(0, 0, 0);
+    fill(150, 150, 150);
+    rect(175,90,175,10,5);
+    rect(175,75,10,40,5);
+    rect(340,75,10,40,5);
+};
+var drawInstructions = function(){
+    fill(0, 0, 0);
+    cursive("Notes to self:",101,-77,200,200);
+    if (instructions > 2){
+        btnI4.draw();
+        btnI5.draw();
+        textAlign(CENTER,CENTER);
+    }
+    if (instructions === 0){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("I have decided to begin keeping this journal after meeting with The Shattered Mind. After seeing his fate. When I grow worthy to bear The curse of Insanity; and I know the day is not far; the following entries will prove vital in my cause. I will be the first to return unscathed from depravity. \n \n \n \nI believe that if any are capable of overcoming the curse, I can be counted among them. ",-1,-7,400,413);
+    }  
+    else if (instructions === 1){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("Right click to interact with an object or speak with a character you are standing next to...Or shout at a character who is far away. Results may vary. \n \n Left click to cast your currently selected primary ability towards the cursor. \n \n Press 'P' to access the pause menue. \n \n Q will activate your equipted artifact, E will drink your current potion, and 1-4 will allow you to use your 4 selected class abilities, usually towards the mouse cursor.",-1,-12,400,413);
+    }
+    else if (instructions === 2){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("1.Collect BIZNASTY LOOT. \n \n 2. Explore the world, solve puzzles, find secrets, and plunder chests to collect BIZNASTY LOOT. \n \n 3. Hunt down mighty foes and purge them from this realm, and upon slaying them collect BIZNASTY LOOT. \n \n 4. Speak all those you come across, assist them to earn a name for yourself, as well as an occasional bit of BIZNASY LOOT \n \n",-1,-8,400,413);
+    }
+    else if (instructions === 3){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("The foes I have been examining will be nigh-impossible to defeat without proper knowlege and strategy. The data I have compiled in my encyclopedia will be vital to do so. \n \n I have found that on harder difficulties, avoidable damage is massivly increased, while unavoidable damage remains similar. \n \n Dont stand in Fire!",-1,-29,400,413);
+    }
+    else if (instructions === 4){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("Enemies will drop the same items during story mode regardless of difficulty. However, in the max-level version of encounters will drop more powerful items on harder difficulty settings. \n \n I have found it quite simple to both add and remove augmentations to any item. Moreso, they appear to have a drastic impact on my artifacts functionality. \n \n Keep yout eyes open!",-1,-29,400,413);
+    }
+    else if (instructions === 5){
+        fill(0, 0, 0);
+        textSize(17);
+        cursive("The heroes of this realm will not be quick to speak of locations where they know treasure to be found, but it appears that in listening carefully knowlege that they would keep from me is not difficult to acertain. \n \n                                                     Hide journal \n                                                      more carfully \n                                                      in future. \n \n Reminder: 6174",-1,-29,400,413);
+        pushMatrix();
+        rotate(15);
+        cursive("DEAR DIARY I DONT KNOW HOW TO HAVE FUN",95,-45,231,413);
+        rotate(1);
+        cursive("-----------------------------\n-----------------------------------",95,-50,244,413);
+        popMatrix();
+        
+    }
+};
+var drawAchievments = function(){
+    if (displayAchieve <= 6){
+        btnA1.draw();
+        btnA2.draw();
+        btnA3.draw();
+        btnA4.draw();
+        btnA5.draw();
+        btnA6.draw();
+    }
+    else if(displayAchieve > 6 && displayAchieve <= 12){
+        btnA7.draw();
+        btnA8.draw();
+        btnA9.draw();
+        btnA10.draw();
+        btnA11.draw();
+        btnA12.draw();
+    }
+    else if (displayAchieve > 12 && displayAchieve <=18){
+        btnA13.draw();
+        btnA14.draw();
+        btnA15.draw();
+        btnA16.draw();
+        btnA17.draw();
+        btnA18.draw();
+    }
+    textAlign(CENTER,CENTER);
+    achv1.draw();
+    achv2.draw();
+    achv3.draw();
+    achv4.draw();
+    achv5.draw();
+    achv6.draw();
+    achv7.draw();
+    achv8.draw();
+    achv9.draw();
+    achv10.draw();
+    achv11.draw();
+    achv12.draw();
+    achv13.draw();
+    achv14.draw();
+    achv15.draw();
+    achv16.draw();
+    achv17.draw();
+    achv18.draw();
+};
+var encyclopediaEntry = function(title,entry,page){
+    if (page === encyclopediaPage){
+        fill(0, 0, 0);
+        cursive(title,50,-25,292,100);
+        textSize(15);
+        cursive(entry,30,40,300,300);
+    }
+};
+var drawEncyclopedia = function() {
+    if (encyclopediaType === 1){
+        image(getImage("cute/CharacterBoy"),56,320,40,60);
+        image(getImage("cute/CharacterCatGirl"),106,320,40,60);
+        image(getImage("cute/CharacterHornGirl"),156,320,40,60);
+        image(getImage("cute/CharacterPinkGirl"),206,320,40,60);
+        image(getImage("cute/CharacterPrincessGirl"),256,320,40,60);
+    }
+    else if (encyclopediaType === 2){
+        image(getImage("avatars/robot_male_3"),56,333,40,40);
+        image(getImage("avatars/robot_female_3"),106,333,40,40);
+        image(getImage("avatars/orange-juice-squid"),156,333,40,40);
+        image(getImage("avatars/piceratops-ultimate"),206,333,40,40);
+        image(getImage("avatars/mr-pink"),256,333,40,40);
+        encyclopediaEntry("High Inquisitors","These 4 reverants lead their inquisition. \n High Exectutioner: Slow, and moves slower when attacked. Must keep distance. \n High Priest: Frail. Should attack whenever there are no more pressign matters to attend to. \n High Bailiff: A mere annoyance. Her allies are the source of her strength. \n The Grand Inquisitor: The others will never let him die so long as they know him to be in danger, and if he flees I will never catch him. I must defeat his allies without scaring him away. \n Fighting the 4 together is suicide, but i have no other choice.",1);
+    }
+    else if (encyclopediaType === 3){
+        image(getImage("cute/GemOrange"),56,315,40,60);
+        image(getImage("cute/GemGreen"),106,315,40,60);
+        image(getImage("cute/GemBlue"),156,315,40,60);
+        image(getImage("cute/Key"),206,315,40,70);
+        image(getImage("cute/Heart"),256,315,40,70);
+    }
+    else if (encyclopediaType === 4){
+        image(getImage("cute/PlainBlock"),56,333,40,40);
+        image(getImage("cute/StoneBlock"),106,333,40,40);
+        image(getImage("cute/WaterBlock"),156,333,40,40);
+        image(getImage("cute/WoodBlock"),206,333,40,40);
+        image(getImage("cute/DirtBlock"),256,333,40,40);
+    }
+    else if (encyclopediaType === 5){
+        image(getImage("space/planet"),56,333,40,40);
+        image(getImage("space/octopus"),106,333,40,40);
+        image(getImage("space/beetleship"),156,333,40,40);
+        image(getImage("cute/TreeTall"),206,333,40,40);
+        image(getImage("cute/Rock"),256,318,40,60);
+    }
+};
+var drawChecks = function(){
+    if(check1){
+        image(getImage("avatars/leaf-green"),200,290,35,35);
+    }
+    if(check2){
+        image(getImage("avatars/leaf-green"),310,290,35,35);
+    }
+};
+var buttonCheck = function(buttonName, state, value){
+    if(buttonName.isMouseOver() && state === value){
+        return true;
+    }
+    else{return false;}
+};
+
+//Health UI
+var shieldWidth = function(){
+    return width*shield/maxHealth;
+};
+var currentHealthWidth = function(){
+    return width*currentHealth/maxHealth;
+};
+var healthTextWidth = function(){
+    return 30 + 3*(log(currentHealth) + log(maxHealth));
+};
+var shieldPosition = function(){
+    if (shield <= maxHealth - currentHealth){
+        return currentHealthWidth();
+    }
+    else{
+        return width - shieldWidth();
+    }
+};
+var shieldTextPosition = function(){
+    if (shieldWidth() < 25){
+        return width + 50;
+    }
+    else if (shieldWidth() > 330 || currentHealthWidth() < 70){
+        return healthTextWidth();
+    }
+    else {
+        return shieldPosition();
+    }
+};
+var drawHealthBar = function(){
+    fill(168, 18, 18);
+    rect(0,380,400,20,2);
+    fill(28, 156, 11);
+    rect(0,380,400*currentHealth/maxHealth,20,2);
+    fill(139, 209, 125);
+    rect(shieldPosition(),height-20,width*shield/maxHealth,20,2);
+    fill(0, 0, 0);
+    textSize(15);
+    text(currentHealth +"/" + maxHealth,5,380,100,20);
+    text(" ("+shield + ")",shieldTextPosition(),380);
+};
+
+// Abilities and UI
+var drawUI = function(){
+    drawHealthBar();
+    artifactUI.draw();
+    specialUI.draw();
+    ability1UI.draw();
+    ability2UI.draw();
+    ability3UI.draw();
+    ability4UI.draw();
+    potienUI.draw();
+    passiveUI.draw();
+    fill(0, 0, 0);
+    textSize(12);
+    text("Q",20,315);
+    text("Space",55,315);
+    text("1",120,315);
+    text("2",170,315);
+    text("3",220,315);
+    text("4",270,315);
+    text("E",320,315);
+    text("Passive",350,315);
+};
+var activateAbilities = function(){
+    keyPush(81,artifactUI);
+    keyPush(32,specialUI);
+    keyPush(49,ability1UI);
+    keyPush(50,ability2UI);
+    keyPush(51,ability3UI);
+    keyPush(52,ability4UI);
+    keyPush(69,potienUI);
+    if (keysDown[80] && pauseDelay > 10){
+        pauseDelay = 0;
+        currentScene = "p";
+    }
+    if (pauseDelay < 11){
+        pauseDelay++;
+    }
+};
+var drawBuffs = function(){
+    var spot = 15;
+    for(var i = 0; i < buffs.length; i++){
+        if (buffs[i].remainingDuration === "n/a"){
+            buffs[i].draw(spot);
+            buffs[i].effect();
+            spot += 50;
+        }
+        else if (buffs[i].remainingDuration < 0){
+            buffs[i] = 0;
+        }
+        else if (buffs[i].remainingDuration <= buffs[i].maxDuration || buffs[i].remainingDuration >= 0) {
+            buffs[i].draw(spot);
+            buffs[i].effect();
+            spot += 50;
+            buffs[i].remainingDuration -= 1;
+        }
+        else{}
+    }
+};
+
+//SCENES
+var drawScene1 = function(){
+    background(112, 1, 40);
+    textSize(54);
+    fill(251, 255, 5);
+    text("Divicide: The murder of Gods",width/6,height/5,
+    width*3/4,height);
+};
+var drawScene2 = function(){
+    background(194, 167, 85);
+    btn1.draw();
+    btn2.draw();
+    btn3.draw();
+    btn4.draw();
+    btn5.draw();
+    textAlign(LEFT,TOP);
+    textSize(25);
+    fill(0, 0, 0);
+    cursive("This journal is the sole property of Summer Còmmlatte",41,294,257,200);
+    btn1.message(25,"I don't play games, child.",214,61,181,180);
+    btn2.message(21,"It is not difficult to change this world.",257,139,106,150);
+    btn3.message(20,"Before you can walk, you must learn to...walk.",249,79,150,150);
+    btn4.message(22,"There is much to be done.",241,187,156,150);
+    btn5.message(17,"We know everything.",218,78,160,229);
+};
+var drawScene3 = function(){
+    background(194,167,85);
+    btnB1.draw();
+    fill(0, 0, 0);
+    textAlign(CENTER,CENTER);
+    cursive("Volume",42,43,100,100);
+    cursive("Difficulty",-7,94,200,200);
+    cursive("Checks",44,243,100,100);
+    cursive("Options",56,-127,300,300);
+    btnO1.draw();
+    btnO2.draw();
+    btnO3.draw();
+    btnO4.draw();
+    btnO5.draw();
+    btnO6.draw();
+    btnO7.draw();
+    drawChecks();
+    drawVolume();
+    fill(0, 0, 0);
+    textAlign(CENTER,CENTER);
+    btnO1.message(17,"Silence. Listen.",62,143,98,213);
+    btnO2.message(17,"I can still hear them scream.",199,254,142,213);
+    btnO3.message(17,"With but a touch. A glance. A breath. The depraved fell as leaves before him.",24,252,339,213);
+    btnO4.message(17,"'Act wisely, and we will survive this day.'",199,144,214,213);
+    btnO5.message(17,"I fear this will be my final entry...",245,257,155,213);
+    btnO6.message(17,"Bishop, e7",62,143,98,213);
+    btnO7.message(17,"Checkmate",199,63,98,213);
+};
+var drawScene4 = function(){
+    background(194,167,85);
+    textAlign(CENTER,CENTER);
+    drawInstructions();
+    btnI1.draw();
+    btnI2.draw();
+    btnI3.draw();
+    btnB2.draw();
+};
+var drawScene5 = function(){
+    background(194,167,85);
+    fill(0, 0, 0);
+    textSize(33);
+    cursive("To do:",105,-18,179,100);
+    btnAB1.draw();
+    btnAB2.draw();
+    btnB3.draw();
+    textAlign(CENTER,CENTER);
+    drawAchievments();
+};
+var drawScene6 = function(){
+    background(194,167,85);
+    btnE1.draw();
+    btnE2.draw();
+    btnE3.draw();
+    btnE4.draw();
+    btnE5.draw();
+    btnB4.draw();
+    btnEP1.draw();
+    btnEP2.draw();
+    btnEP3.draw();
+    btnEP4.draw();
+    btnEP5.draw();
+    btnEP5.draw();
+    textAlign(CENTER,CENTER);
+    drawEncyclopedia();
+};
+var drawPause = function(){
+    if (keysDown[80] && pauseDelay > 10){
+        currentScene = 7;
+        pauseDelay = 0;
+        pauseOption = 0;
+    }
+    if (pauseDelay < 11){
+        pauseDelay++;
+    }
+    background(194,167,85);
+    fill(0, 0, 0);
+    textSize(50);
+    text("Pause",10,5);
+    btnP1.draw();
+    btnP2.draw();
+    btnP3.draw();
+    btnP4.draw();
+    btnP5.draw();
+    btnP6.draw();
+    btnP7.draw();
+    btnP8.draw();
+    if(pauseOption === 1){
+        btnPQ1.draw();
+        btnPQ2.draw();
+        btnPQ3.draw();
+    }
+    if(pauseOption === 2){
+        btnPQ4.draw();
+        btnPQ5.draw();
+        btnPQ6.draw();
+    }
+    if(pauseOption === 3){
+        btnPQ7.draw();
+        btnPQ8.draw();
+        btnPQ9.draw();
+    }
+    if(pauseOption === 4){
+        btnPQ10.draw();
+        btnPQ11.draw();
+        btnPQ12.draw();
+    }
+    if(pauseOption === 5){
+        btnPQ13.draw();
+        btnPQ14.draw();
+        btnPQ15.draw();
+    }
+    if(pauseOption === 6){
+        btnPQ16.draw();
+        btnPQ17.draw();
+        btnPQ18.draw();
+    }
+    if(pauseOption === 7){
+        btnPQ19.draw();
+        btnPQ20.draw();
+        btnPQ21.draw();
+    }
+    if(pauseOption === 8){
+        btnPQ22.draw();
+        btnPQ23.draw();
+        btnPQ24.draw();
+    }
+    if(buttonCheck(btnPQ1,pauseOption,1)){
+        fill(0, 0, 0);
+        cursive("This artifact fires a ring of 12 bullets around you!",20,60,366,400);
+    }
+    else if(buttonCheck(btnPQ2,pauseOption,1)){
+        fill(0, 0, 0);
+        cursive("This artifact is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ3,pauseOption,1)){
+        fill(0, 0, 0);
+        cursive("This artifact is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ4,pauseOption,2)){
+        fill(0, 0, 0);
+        cursive("This special power fires 5 innacurate bullets towards your target!",20,60,365,400);
+    }
+    else if(buttonCheck(btnPQ5,pauseOption,2)){
+        fill(0, 0, 0);
+        cursive("This special power is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ6,pauseOption,2)){
+        fill(0, 0, 0);
+        cursive("This special power is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ7,pauseOption,3)){
+        fill(0, 0, 0);
+        cursive("This ability teleports you towards your cursor!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ8,pauseOption,3)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ9,pauseOption,3)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ10,pauseOption,4)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ11,pauseOption,4)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ12,pauseOption,4)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ13,pauseOption,5)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ14,pauseOption,5)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ15,pauseOption,5)){
+        fill(0, 0, 0);
+        cursive("This ability is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ16,pauseOption,6)){
+        fill(0, 0, 0);
+        cursive("This toggle lets you move quickly, at the cost of health!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ17,pauseOption,6)){
+        fill(0, 0, 0);
+        cursive("This toggle is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ18,pauseOption,6)){
+        fill(0, 0, 0);
+        cursive("This toggle is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ19,pauseOption,7)){
+        fill(0, 0, 0);
+        cursive("This potien lets you move quickly for 10 seconds!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ20,pauseOption,7)){
+        fill(0, 0, 0);
+        cursive("This potien is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ21,pauseOption,7)){
+        fill(0, 0, 0);
+        cursive("This potien is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ22,pauseOption,8)){
+        fill(0, 0, 0);
+        cursive("This passive is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ23,pauseOption,8)){
+        fill(0, 0, 0);
+        cursive("This passive is not yet available!",20,60,400,400);
+    }
+    else if(buttonCheck(btnPQ24,pauseOption,8)){
+        fill(0, 0, 0);
+        cursive("This passive is not yet available!",20,60,400,400);
+    }
+};
+
+//THE BIG ONE
+var drawGame = function(){
+    background(0, 140, 15);
+    projectileUpdate();
+    drawProjectiles();
+    drawPlayer();
+    movePlayer();
+    drawBuffs();
+    drawUI();
+    activateAbilities();
+};
+
+draw = function() {
+     if (currentScene === 1){
+         drawScene1();
+     }
+     if (currentScene === 2){
+         drawScene2();
+     }
+     if (currentScene === 3){
+         drawScene3();
+     }
+     if (currentScene === 4){
+         drawScene4();
+     }
+     if (currentScene === 5){
+         drawScene5();
+     }
+     if (currentScene === 6){
+         drawScene6();
+     }
+     if (currentScene === 7){
+         drawGame();
+     }
+     if (currentScene === "p"){
+         drawPause();
+     }
+};
+mouseClicked = function(){
+    if (currentScene === 1){
+        currentScene = 2;
+    }
+    else if (currentScene === 2){
+        btn1.click();
+        btn2.click();
+        btn3.click();
+        btn4.click();
+        btn5.click();
+    }
+    else if (currentScene === 3){
+        btnB1.click();
+        btnO1.click();
+        btnO2.click();
+        btnO3.click();
+        btnO4.click();
+        btnO5.click();
+        btnO6.click();
+        btnO7.click();
+    }
+    else if (currentScene === 4){
+        btnI1.click();
+        btnI2.click();
+        btnI3.click();
+        btnI4.click();
+        btnI5.click();
+        btnB2.click();
+    }
+    else if (currentScene === 5){
+        btnAB1.click();
+        btnAB2.click();
+        btnB3.click();
+        if (displayAchieve <= 6){
+            btnA1.click();
+            btnA2.click();
+            btnA3.click();
+            btnA4.click();
+            btnA5.click();
+            btnA6.click();
+        }
+        else if (displayAchieve > 6 && displayAchieve <= 12){
+            btnA7.click();
+            btnA8.click();
+            btnA9.click();
+            btnA10.click();
+            btnA11.click();
+            btnA12.click();
+        }
+        else if (displayAchieve > 12 && displayAchieve <= 18){
+            btnA13.click();
+            btnA14.click();
+            btnA15.click();
+            btnA16.click();
+            btnA17.click();
+            btnA18.click();
+        }
+    }
+    else if (currentScene === 6){
+        btnE1.click();
+        btnE2.click();
+        btnE3.click();
+        btnE4.click();
+        btnE5.click();
+        btnB4.click();
+        btnEP1.click();
+        btnEP2.click();
+        btnEP3.click();
+        btnEP4.click();
+        btnEP5.click();
+    }
+    else if (currentScene === 7){
+        fireSpam();
+    }
+};
+keyPressed = function(){
+    keysDown[keyCode] = true;
+};
+keyReleased = function(){
+    keysDown[keyCode] = false;
+};
